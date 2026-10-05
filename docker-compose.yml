@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ev_charging_backend
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHONPATH=/app
+      - FLASK_ENV=production
+    networks:
+      - ev_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ev_charging_frontend
+    ports:
+      - "80:80"
+      - "5500:80"
+    depends_on:
+      - backend
+    networks:
+      - ev_network
+
+networks:
+  ev_network:
+    driver: bridge

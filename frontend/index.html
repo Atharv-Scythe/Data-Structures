@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOLTRONIC • Smart EV Charging & Route Optimizer</title>
+    <meta name="description" content="Industrial-grade EV charging queue scheduling, Min-Heap priority dispatch, and Dijkstra shortest path route optimizer.">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-layout">
+
+        <!-- =================================================
+             TOP NAVIGATION BAR
+        ================================================== -->
+        <header class="app-navbar">
+            <div class="nav-container">
+                <!-- Brand / Logo -->
+                <div class="nav-brand">
+                    <div class="brand-icon-wrap">
+                        <span class="brand-icon">⚡</span>
+                        <span class="brand-pulse"></span>
+                    </div>
+                    <div class="brand-text">
+                        <div class="brand-title">VOLTRONIC <span class="brand-badge">DSA Core</span></div>
+                        <div class="brand-subtitle">Smart EV Charging & Route Optimizer</div>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs (Section Switcher) -->
+                <nav class="nav-tabs" role="tablist" aria-label="Dashboard Views">
+                    <button class="nav-tab active" data-tab="overview" role="tab" aria-selected="true">
+                        <span class="tab-icon">⚡</span>
+                        <span class="tab-label">Overview</span>
+                    </button>
+                    <button class="nav-tab" data-tab="queues" role="tab" aria-selected="false">
+                        <span class="tab-icon">🗂️</span>
+                        <span class="tab-label">Queues & Heap</span>
+                    </button>
+                    <button class="nav-tab" data-tab="routing" role="tab" aria-selected="false">
+                        <span class="tab-icon">🌐</span>
+                        <span class="tab-label">Network & Route</span>
+                    </button>
+                    <button class="nav-tab" data-tab="stations" role="tab" aria-selected="false">
+                        <span class="tab-icon">🔋</span>
+                        <span class="tab-label">Stations</span>
+                    </button>
+                    <button class="nav-tab" data-tab="audit" role="tab" aria-selected="false">
+                        <span class="tab-icon">📊</span>
+                        <span class="tab-label">Trace & Complexity</span>
+                    </button>
+                </nav>
+
+                <!-- Actions & Theme Toggle -->
+                <div class="nav-actions">
+                    <!-- Theme Toggle Switch -->
+                    <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Toggle light and dark mode" title="Switch Theme">
+                        <span class="theme-icon sun-icon">☀️</span>
+                        <span class="theme-icon moon-icon">🌙</span>
+                        <span id="themeLabel" class="theme-btn-label">Dark</span>
+                    </button>
+
+                    <!-- API Health Badge -->
+                    <div class="connection-badge">
+                        <span id="connectionDot" class="connection-dot"></span>
+                        <span id="connectionText">Connecting...</span>
+                    </div>
+
+                    <!-- Quick Tools -->
+                    <div class="quick-tools">
+                        <button id="demoReportBtn" class="btn sm secondary" title="Simulation Executive Report">📊 Report</button>
+                        <button id="exportJsonBtn" class="btn sm secondary" title="Export Events JSON">📥 JSON</button>
+                        <button id="exportCsvBtn" class="btn sm secondary" title="Export Events CSV">📥 CSV</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- =================================================
+             LIVE ACTION NOTIFICATION TOAST BAR
+        ================================================== -->
+        <div class="action-status-bar">
+            <div class="status-inner">
+                <span class="status-indicator-dot"></span>
+                <span class="status-title">SYSTEM STATUS:</span>
+                <span id="lastAction" class="status-message">Ready</span>
+            </div>
+        </div>
+
+        <!-- =================================================
+             MAIN CONTENT SECTIONS (TAB VIEWS)
+        ================================================== -->
+        <main class="main-content">
+
+            <!-- =============================================
+                 TAB 1: OVERVIEW (FRONTPAGE)
+            ============================================== -->
+            <section id="viewOverview" class="tab-pane active" role="tabpanel">
+                
+                <!-- KPI METRICS BANNER -->
+                <div class="stats-grid">
+                    <div class="stat-card" data-metric="total">
+                        <div class="stat-header">
+                            <span class="stat-label">TOTAL VEHICLES</span>
+                            <span class="stat-icon">🚗</span>
+                        </div>
+                        <div id="evCount" class="stat-value">0</div>
+                        <div class="stat-subtext">Registered in fleet</div>
+                    </div>
+
+                    <div class="stat-card" data-metric="waiting">
+                        <div class="stat-header">
+                            <span class="stat-label">QUEUED / WAITING</span>
+                            <span class="stat-icon">⏳</span>
+                        </div>
+                        <div id="waitingCount" class="stat-value">0</div>
+                        <div class="stat-subtext">Across FIFO, Heap & Deque</div>
+                    </div>
+
+                    <div class="stat-card" data-metric="charging">
+                        <div class="stat-header">
+                            <span class="stat-label">ACTIVE CHARGING</span>
+                            <span class="stat-icon">⚡</span>
+                        </div>
+                        <div id="chargingCount" class="stat-value">0</div>
+                        <div class="stat-subtext">Occupying station slots</div>
+                    </div>
+
+                    <div class="stat-card" data-metric="completed">
+                        <div class="stat-header">
+                            <span class="stat-label">SESSIONS FINISHED</span>
+                            <span class="stat-icon">✅</span>
+                        </div>
+                        <div id="completedCount" class="stat-value">0</div>
+                        <div class="stat-subtext">Fully recharged & released</div>
+                    </div>
+
+                    <div class="stat-card" data-metric="stations">
+                        <div class="stat-header">
+                            <span class="stat-label">ACTIVE STATIONS</span>
+                            <span class="stat-icon">🏢</span>
+                        </div>
+                        <div id="stationCount" class="stat-value">0</div>
+                        <div class="stat-subtext">Locations online</div>
+                    </div>
+
+                    <div class="stat-card" data-metric="events">
+                        <div class="stat-header">
+                            <span class="stat-label">ENGINE EVENTS</span>
+                            <span class="stat-icon">📈</span>
+                        </div>
+                        <div id="eventCount" class="stat-value">0</div>
+                        <div class="stat-subtext">Operations logged</div>
+                    </div>
+                </div>
+
+                <!-- OVERVIEW MAIN GRID: DISPATCH CONSOLE & CITY NETWORK MAP -->
+                <div class="dashboard-grid">
+
+                    <!-- DISPATCH ENGINE CONTROLS -->
+                    <div class="panel control-panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">DISPATCH & SIMULATION ENGINE</span>
+                                <h2>Vehicle Ingestion & Controls</h2>
+                            </div>
+                            <span class="pill-badge pill-accent">Active Dispatcher</span>
+                        </div>
+
+                        <!-- Form Controls -->
+                        <div class="control-form-grid">
+                            <div class="form-group">
+                                <label for="evId">Vehicle ID</label>
+                                <input id="evId" type="text" value="EV001" placeholder="e.g. EV001">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="batteryLevel">Battery Level (%)</label>
+                                <input id="batteryLevel" type="number" min="0" max="100" value="75">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="location">Current Node</label>
+                                <select id="location">
+                                    <option value="A">Node A</option>
+                                    <option value="B">Node B</option>
+                                    <option value="C">Node C</option>
+                                    <option value="D">Node D</option>
+                                    <option value="E">Node E</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="queueTypeSelect">Queue Policy</label>
+                                <select id="queueTypeSelect">
+                                    <option value="auto">Auto Classify (&lt;25% Heap, else FIFO)</option>
+                                    <option value="normal">Simple Queue (FIFO)</option>
+                                    <option value="priority">Priority Min-Heap (Critical)</option>
+                                    <option value="special">Special Deque (Rear)</option>
+                                    <option value="special_front">Special Deque (Front - VIP)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Primary Buttons Toolbar -->
+                        <div class="action-buttons-wrap">
+                            <div class="btn-group-left">
+                                <button id="addEvButton" class="btn primary">
+                                    <span class="btn-icon">⚡</span> Add EV
+                                </button>
+                                <button id="processButton" class="btn success">
+                                    <span class="btn-icon">▶</span> Process Next EV
+                                </button>
+                                <button id="sampleDataBtn" class="btn secondary">
+                                    <span class="btn-icon">🎲</span> Load Sample Fleet
+                                </button>
+                            </div>
+                            <div class="btn-group-right">
+                                <button id="autoSimBtn" class="btn accent">
+                                    <span class="btn-icon">▶</span> Auto Simulation
+                                </button>
+                                <select id="autoSimSpeed" class="speed-select" title="Simulation Speed">
+                                    <option value="3000">1x (Slow)</option>
+                                    <option value="1500" selected>2x (Normal)</option>
+                                    <option value="800">4x (Fast)</option>
+                                </select>
+                                <button id="resetButton" class="btn warning" title="Reset Simulation Data">🔄 Reset</button>
+                                <button id="clearBtn" class="btn danger" title="Clear All Vehicles">🗑 Clear</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INTERACTIVE CITY NETWORK GRAPH & DIJKSTRA ROUTING -->
+                    <div class="panel graph-panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">TOPOLOGY & DIJKSTRA SHORTEST PATH</span>
+                                <h2>City Charging Infrastructure Network</h2>
+                            </div>
+                            <div class="route-controls-compact">
+                                <div class="route-select-pair">
+                                    <label for="startLocation">From:</label>
+                                    <select id="startLocation" class="mini-select">
+                                        <option value="A">A</option>
+                                        <option value="B">B</option>
+                                        <option value="C">C</option>
+                                        <option value="D">D</option>
+                                        <option value="E">E</option>
+                                    </select>
+                                </div>
+                                <div class="route-select-pair">
+                                    <label for="destLocation">To:</label>
+                                    <select id="destLocation" class="mini-select">
+                                        <option value="E">E</option>
+                                        <option value="D">D</option>
+                                        <option value="C">C</option>
+                                        <option value="B">B</option>
+                                        <option value="A">A</option>
+                                    </select>
+                                </div>
+                                <button id="findRouteBtn" class="btn sm primary">🔍 Route</button>
+                                <button id="findNearestBtn" class="btn sm secondary">⚡ Nearest</button>
+                            </div>
+                        </div>
+
+                        <!-- Graph Canvas Container -->
+                        <div class="graph-canvas-container">
+                            <svg id="graphSvg" class="graph-svg" width="100%" height="320"></svg>
+                            <div id="routeInfoPanel" class="route-info-container"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- OVERVIEW BOTTOM SPLIT: QUICK ACTIVE CHARGING & SECTION JUMP CARDS -->
+                <div class="overview-bottom-grid">
+                    
+                    <!-- ACTIVE CHARGING BAYS SNAPSHOT -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">REAL-TIME TELEMETRY</span>
+                                <h2>Active Charging Bays</h2>
+                            </div>
+                            <button class="link-btn" onclick="navigateToTab('stations')">View All Bays ➔</button>
+                        </div>
+                        <div id="chargingListOverview" class="queue-container empty-state">No EVs charging</div>
+                    </div>
+
+                    <!-- ARCHITECTURE EXPLORATION TILES -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">PROJECT SECTIONS</span>
+                                <h2>Explore System Architecture</h2>
+                            </div>
+                        </div>
+
+                        <div class="explore-tiles-grid">
+                            <div class="explore-tile" onclick="navigateToTab('queues')">
+                                <div class="tile-icon-bubble green">🗂️</div>
+                                <div class="tile-body">
+                                    <h3>Queuing Data Structures</h3>
+                                    <p>FIFO Circular Queue, Priority Min-Heap Binary Tree, and Double-Ended Deque.</p>
+                                </div>
+                                <span class="tile-arrow">➔</span>
+                            </div>
+
+                            <div class="explore-tile" onclick="navigateToTab('routing')">
+                                <div class="tile-icon-bubble blue">🌐</div>
+                                <div class="tile-body">
+                                    <h3>Network & Dijkstra Routing</h3>
+                                    <p>Weighted adjacency graph model with O((V+E) log V) shortest-path optimization.</p>
+                                </div>
+                                <span class="tile-arrow">➔</span>
+                            </div>
+
+                            <div class="explore-tile" onclick="navigateToTab('stations')">
+                                <div class="tile-icon-bubble amber">🔋</div>
+                                <div class="tile-body">
+                                    <h3>Charging Infrastructure</h3>
+                                    <p>Multi-slot station management, capacity allocation, and session completion.</p>
+                                </div>
+                                <span class="tile-arrow">➔</span>
+                            </div>
+
+                            <div class="explore-tile" onclick="navigateToTab('audit')">
+                                <div class="tile-icon-bubble purple">📊</div>
+                                <div class="tile-body">
+                                    <h3>Trace & Complexity Audit</h3>
+                                    <p>Formal Big-O complexity tables, live operation execution logs, and event audits.</p>
+                                </div>
+                                <span class="tile-arrow">➔</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =============================================
+                 TAB 2: QUEUES & HEAPS (DATA STRUCTURES)
+            ============================================== -->
+            <section id="viewQueues" class="tab-pane" role="tabpanel">
+                
+                <div class="section-hero-header">
+                    <span class="section-tag">CORE ALGORITHMIC FOUNDATION</span>
+                    <h2>Queuing & Priority Data Structures</h2>
+                    <p class="section-desc">
+                        Three specialized data structures handling standard FIFO arrivals, emergency low-battery prioritization via Min-Heap, and VIP/fast-track access via Double-Ended Deque.
+                    </p>
+                </div>
+
+                <div class="queues-display-grid">
+                    
+                    <!-- 1. NORMAL FIFO QUEUE -->
+                    <div class="panel queue-detail-card">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">DATA STRUCTURE 1</span>
+                                <h2>Standard FIFO Queue</h2>
+                            </div>
+                            <span class="complexity-chip o1">O(1) Enqueue / Dequeue</span>
+                        </div>
+                        <p class="queue-card-desc">
+                            First-In, First-Out queue for standard EVs with normal battery levels (&gt;25%). Dispatched in chronological order of arrival.
+                        </p>
+                        <div id="normalQueue" class="queue-container empty-state">Queue is empty</div>
+                    </div>
+
+                    <!-- 2. PRIORITY MIN-HEAP -->
+                    <div class="panel queue-detail-card heap-expanded-card">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">DATA STRUCTURE 2</span>
+                                <h2>Priority Min-Heap (Critical EVs)</h2>
+                            </div>
+                            <span class="complexity-chip ologn">O(log n) Heapify</span>
+                        </div>
+                        <p class="queue-card-desc">
+                            Binary Min-Heap prioritizing urgent EVs (&le;25% battery). The vehicle with lowest remaining charge bubbles to the root for instant emergency dispatch.
+                        </p>
+
+                        <div class="heap-dual-display">
+                            <div class="heap-subcard">
+                                <div class="subcard-title">Binary Tree Visualization (Root = Minimum Battery)</div>
+                                <div id="heapTreeContainer" class="heap-tree-box"></div>
+                            </div>
+                            <div class="heap-subcard">
+                                <div class="subcard-title">Sequential Array Representation [Index 0..n-1]</div>
+                                <div id="heapArrayContainer" class="heap-array-box"></div>
+                            </div>
+                        </div>
+                        <div id="priorityQueue" class="legacy-hidden"></div>
+                    </div>
+
+                    <!-- 3. DOUBLE-ENDED DEQUE -->
+                    <div class="panel queue-detail-card">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">DATA STRUCTURE 3</span>
+                                <h2>Double-Ended Queue (Deque)</h2>
+                            </div>
+                            <span class="complexity-chip o1">O(1) Both Ends</span>
+                        </div>
+                        <p class="queue-card-desc">
+                            Double-ended queue for special and VIP dispatch. Allows insertion and removal at both front (priority bypass) and rear.
+                        </p>
+                        <div id="specialQueue" class="queue-container empty-state">Deque is empty</div>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =============================================
+                 TAB 3: NETWORK & ROUTING (GRAPH & DIJKSTRA)
+            ============================================== -->
+            <section id="viewRouting" class="tab-pane" role="tabpanel">
+
+                <div class="section-hero-header">
+                    <span class="section-tag">GRAPH ALGORITHMS</span>
+                    <h2>City Road Network & Dijkstra's Algorithm</h2>
+                    <p class="section-desc">
+                        Weighted undirected graph modeling urban road network transit costs, combined with Dijkstra's algorithm accelerated by a Min-Heap priority queue to guarantee mathematically optimal routing.
+                    </p>
+                </div>
+
+                <div class="routing-layout-grid">
+                    
+                    <!-- Graph Info & Dijkstra Mechanics -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">ALGORITHM SPECIFICATION</span>
+                                <h2>Dijkstra Shortest Path Formulation</h2>
+                            </div>
+                            <span class="complexity-chip o-graph">O((V + E) log V)</span>
+                        </div>
+
+                        <div class="algorithm-spec-content">
+                            <div class="spec-card">
+                                <h3>Graph Structure</h3>
+                                <p><strong>Vertices (V):</strong> Urban nodes representing intersections and station depots (A, B, C, D, E).</p>
+                                <p><strong>Edges (E):</strong> Road connections weighted by physical travel distance and traffic delays.</p>
+                            </div>
+
+                            <div class="spec-card">
+                                <h3>Priority Queue Relaxation</h3>
+                                <p>Maintains tentative distances in a Min-Heap. At each step, extracts the vertex with minimum tentative distance and relaxes all outgoing edges.</p>
+                            </div>
+
+                            <div class="spec-card">
+                                <h3>Nearest Station Dispatch</h3>
+                                <p>Automatically computes shortest paths to all active stations with free bays and assigns the EV to the global minimum cost station.</p>
+                            </div>
+                        </div>
+
+                        <!-- Graph Adjacency Table -->
+                        <div class="topology-table-wrap">
+                            <h3>Network Topology Adjacency Matrix</h3>
+                            <table class="topology-table">
+                                <thead>
+                                    <tr>
+                                        <th>Node</th>
+                                        <th>Connected Neighbors & Weights</th>
+                                        <th>Infrastructure</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><span class="node-pill">Node A</span></td>
+                                        <td>B (4 units), C (2 units)</td>
+                                        <td>⚡ Station S1 (2 bays)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="node-pill">Node B</span></td>
+                                        <td>A (4 units), D (5 units), E (9 units)</td>
+                                        <td>Transit Corridor</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="node-pill">Node C</span></td>
+                                        <td>A (2 units), D (1 units), E (7 units)</td>
+                                        <td>Transit Corridor</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="node-pill">Node D</span></td>
+                                        <td>B (5 units), C (1 units), E (2 units)</td>
+                                        <td>Interchange Hub</td>
+                                    </tr>
+                                    <tr>
+                                        <td><span class="node-pill">Node E</span></td>
+                                        <td>B (9 units), C (7 units), D (2 units)</td>
+                                        <td>⚡ Station S2 (2 bays)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Full Route Playground -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">SIMULATION RUNNER</span>
+                                <h2>Route Calculation & Step Trace</h2>
+                            </div>
+                        </div>
+
+                        <div class="route-test-box">
+                            <p class="muted-text">Test route calculations between any two urban points or compute nearest station from any location.</p>
+                            <div class="route-calc-bar">
+                                <div class="calc-field">
+                                    <label>Origin Node:</label>
+                                    <span class="field-badge">Origin</span>
+                                </div>
+                                <div class="calc-field">
+                                    <label>Destination:</label>
+                                    <span class="field-badge">Target</span>
+                                </div>
+                            </div>
+                            <div class="routing-action-note">
+                                <p>Use the Route Finder in the <strong>Overview</strong> frontpage to interact with the live map directly and observe the animated vehicle trajectory in real-time.</p>
+                                <button class="btn primary sm" onclick="navigateToTab('overview')">➔ Go to Live Map in Overview</button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =============================================
+                 TAB 4: STATIONS & INFRASTRUCTURE
+            ============================================== -->
+            <section id="viewStations" class="tab-pane" role="tabpanel">
+
+                <div class="section-hero-header">
+                    <span class="section-tag">INFRASTRUCTURE & FLEET TELEMETRY</span>
+                    <h2>Charging Stations & Bay Occupancy</h2>
+                    <p class="section-desc">
+                        Live monitoring of charging station capacities, bay allocations, charging progress bars, and battery recharge cycles.
+                    </p>
+                </div>
+
+                <div class="stations-layout-grid">
+                    
+                    <!-- Station Infrastructure List -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">FACILITIES</span>
+                                <h2>Charging Stations & Capacity</h2>
+                            </div>
+                            <span class="pill-badge pill-blue">Multi-Bay Stations</span>
+                        </div>
+                        <div id="stationList" class="station-list empty-state">No charging stations</div>
+                    </div>
+
+                    <!-- Active Charging Sessions -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">CHARGING TELEMETRY</span>
+                                <h2>Live Charging Bays</h2>
+                            </div>
+                            <span class="pill-badge pill-accent">Active Currents</span>
+                        </div>
+                        <div id="chargingList" class="queue-container empty-state">No EVs charging</div>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- =============================================
+                 TAB 5: TRACE & COMPLEXITY AUDIT
+            ============================================== -->
+            <section id="viewAudit" class="tab-pane" role="tabpanel">
+
+                <div class="section-hero-header">
+                    <span class="section-tag">ALGORITHMIC AUDIT & EXECUTION TRACE</span>
+                    <h2>Data Structure Complexity & Audit Log</h2>
+                    <p class="section-desc">
+                        Comprehensive Big-O theoretical analysis, live data structure operation trace log, and complete simulation event ledger.
+                    </p>
+                </div>
+
+                <!-- BIG-O COMPLEXITY REFERENCE GRID -->
+                <div class="complexity-card-grid">
+                    <div class="complexity-item">
+                        <div class="comp-top">
+                            <span class="op-title">Queue Enqueue / Dequeue</span>
+                            <span class="comp-badge o1">O(1)</span>
+                        </div>
+                        <p class="comp-desc">Constant time FIFO insertion & removal using circular head/tail indices in array memory.</p>
+                        <div class="comp-space">Space: <strong>O(n)</strong></div>
+                    </div>
+
+                    <div class="complexity-item">
+                        <div class="comp-top">
+                            <span class="op-title">Min-Heap Insert / Extract-Min</span>
+                            <span class="comp-badge ologn">O(log n)</span>
+                        </div>
+                        <p class="comp-desc">Binary tree heapify-up and heapify-down bubbling operations bounding height to log2(n).</p>
+                        <div class="comp-space">Space: <strong>O(n)</strong></div>
+                    </div>
+
+                    <div class="complexity-item">
+                        <div class="comp-top">
+                            <span class="op-title">Deque Add / Remove Ends</span>
+                            <span class="comp-badge o1">O(1)</span>
+                        </div>
+                        <p class="comp-desc">Double-ended queue access allowing instant insertion and removal at both front & rear.</p>
+                        <div class="comp-space">Space: <strong>O(n)</strong></div>
+                    </div>
+
+                    <div class="complexity-item">
+                        <div class="comp-top">
+                            <span class="op-title">Dijkstra Shortest Path</span>
+                            <span class="comp-badge o-graph">O((V + E) log V)</span>
+                        </div>
+                        <p class="comp-desc">Custom Min-Heap priority queue optimization over vertex relaxation on weighted graph.</p>
+                        <div class="comp-space">Space: <strong>O(V + E)</strong></div>
+                    </div>
+                </div>
+
+                <!-- AUDIT DUAL LOGS -->
+                <div class="audit-logs-grid">
+                    
+                    <!-- DATA STRUCTURE OPERATION TRACE -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">MEMORY & DS OPERATIONS</span>
+                                <h2>Data Structure Operation Trace</h2>
+                            </div>
+                            <span class="pill-badge pill-purple">Trace Logger</span>
+                        </div>
+                        <p class="muted-text pad-x">Step-by-step memory operations captured across all 3 data structures and graph algorithms.</p>
+                        <div id="dsTraceList" class="ds-trace-container"></div>
+                    </div>
+
+                    <!-- SIMULATION EVENT LOG -->
+                    <div class="panel">
+                        <div class="panel-heading">
+                            <div>
+                                <span class="section-tag">SIMULATION AUDIT LEDGER</span>
+                                <h2>Event Timeline</h2>
+                            </div>
+                            <span id="eventBadge" class="event-badge">0</span>
+                        </div>
+                        <p class="muted-text pad-x">Chronological event ledger recording each vehicle arrival, dispatch, routing and completion.</p>
+                        <div id="eventList" class="event-list empty-state">No events yet</div>
+                    </div>
+
+                </div>
+
+            </section>
+
+        </main>
+
+        <!-- =================================================
+             MODALS: EXECUTIVE SUMMARY REPORT
+        ================================================== -->
+        <div id="reportModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2 id="modalTitle">📊 EV Simulation Executive Summary</h2>
+                    <button id="closeReportBtn" class="modal-close-btn" aria-label="Close modal">&times;</button>
+                </div>
+                <div id="reportModalBody" class="modal-body">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- =================================================
+             FOOTER
+        ================================================== -->
+        <footer class="app-footer">
+            <div class="footer-inner">
+                <div class="footer-left">
+                    <span class="footer-brand">⚡ VOLTRONIC EV Simulation Suite</span>
+                    <span class="footer-divider">•</span>
+                    <span>Industrial Data Structures & Graph Algorithms Project</span>
+                </div>
+                <div class="footer-right">
+                    <span>Core DS: Queue (FIFO) • Min-Heap (Priority) • Deque (Double-Ended) • Graph + Dijkstra</span>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/graph.js"></script>
+    <script src="js/heap.js"></script>
+    <script src="js/queue.js"></script>
+    <script src="js/deque.js"></script>
+    <script src="js/simulation.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>
