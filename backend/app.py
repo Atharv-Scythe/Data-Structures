@@ -1,5 +1,8 @@
 # pyrefly: ignore [missing-import]
-from flask import Flask, jsonify
+
+from pathlib import Path
+
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 
 from src.algorithms.graph import Graph
@@ -7,19 +10,28 @@ from src.services.simulation import EVChargingSimulation
 from src.api import create_api_blueprint
 
 
+# ============================================================
+# PROJECT PATHS
+# ============================================================
+
+BACKEND_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BACKEND_DIR.parent
+FRONTEND_DIR = PROJECT_DIR / "frontend"
+
+
+# ============================================================
+# DEMO GRAPH
+# ============================================================
+
 def build_demo_graph():
     """
-    Build the default EV charging network used when the API starts.
+    Build the default EV charging network.
 
-    The graph gives us a ready-to-use network for API testing,
-    frontend development and demonstrations.
+    Vertices represent locations/intersections.
+    Weighted edges represent roads/distances.
     """
 
     graph = Graph()
-
-    # ---------------------------------------------------------
-    # Vertices
-    # ---------------------------------------------------------
 
     vertices = [
         "A",
@@ -31,10 +43,6 @@ def build_demo_graph():
 
     for vertex in vertices:
         graph.add_vertex(vertex)
-
-    # ---------------------------------------------------------
-    # Weighted roads
-    # ---------------------------------------------------------
 
     graph.add_edge("A", "B", 4)
     graph.add_edge("A", "C", 2)
@@ -50,23 +58,36 @@ def build_demo_graph():
     return graph
 
 
+# ============================================================
+# APPLICATION FACTORY
+# ============================================================
+
 def create_app(testing=False, simulation=None):
     """
-    Application factory.
+    Create and configure the Flask application.
 
-    A simulation can be injected during testing, otherwise a
-    fresh demo simulation is created.
+    Flask serves both:
+
+        1. REST API
+        2. Frontend dashboard
+
+    This allows the entire project to run with:
+
+        python app.py
     """
 
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        static_folder=None
+    )
 
     app.config.update(
         TESTING=testing
     )
 
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
     # Create simulation
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
 
     if simulation is None:
 
@@ -74,12 +95,11 @@ def create_app(testing=False, simulation=None):
 
         simulation = EVChargingSimulation(graph)
 
-    # Store simulation on Flask's extension registry.
     app.extensions["ev_simulation"] = simulation
 
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
     # CORS
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
 
     CORS(
         app,
@@ -90,49 +110,91 @@ def create_app(testing=False, simulation=None):
         }
     )
 
-    # ---------------------------------------------------------
-    # Register API
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
+    # REST API
+    # --------------------------------------------------------
 
     app.register_blueprint(
         create_api_blueprint(simulation),
         url_prefix="/api"
     )
 
-    # ---------------------------------------------------------
-    # Root endpoint
-    # ---------------------------------------------------------
+    # ========================================================
+    # FRONTEND
+    # ========================================================
 
     @app.get("/")
-    def index():
+    def serve_frontend():
+        """
+        Serve the main frontend dashboard.
+        """
 
-        return jsonify({
-            "name": "Smart EV Charging Queue & Route Optimizer",
-            "status": "online",
-            "api": "/api",
-            "health": "/api/health"
-        })
+        return send_from_directory(
+            FRONTEND_DIR,
+            "index.html"
+        )
+
+    @app.get("/<path:path>")
+    def serve_frontend_file(path):
+        """
+        Serve frontend CSS, JavaScript and other static files.
+
+        Examples:
+
+            /css/style.css
+            /js/main.js
+            /js/graph.js
+        """
+
+        # Never treat API routes as frontend routes.
+        if path.startswith("api/"):
+
+            return jsonify({
+                "success": False,
+                "error": {
+                    "message": "API endpoint not found"
+                }
+            }), 404
+
+        file_path = FRONTEND_DIR / path
+
+        if file_path.is_file():
+
+            return send_from_directory(
+                FRONTEND_DIR,
+                path
+            )
+
+        # Fallback to index.html.
+        return send_from_directory(
+            FRONTEND_DIR,
+            "index.html"
+        )
 
     return app
 
 
-# Default application instance
+# ============================================================
+# APPLICATION INSTANCE
+# ============================================================
+
 app = create_app()
 
 
-if __name__ == "__main__":
-    import os
+# ============================================================
+# SERVER
+# ============================================================
 
-    # Display clear service endpoints banner in terminal
-    if os.environ.get("WERKZEUG_RUN_MAIN") != "false":
-        print("\n" + "=" * 54)
-        print("  SMART EV CHARGING CONTROL & ROUTE OPTIMIZER")
-        print("=" * 54)
-        print(f"  {'Service':<24}{'URL'}")
-        print("  " + "-" * 50)
-        print(f"  {'Backend API':<24}http://127.0.0.1:5000")
-        print(f"  {'Frontend Dashboard':<24}http://127.0.0.1:5500")
-        print("=" * 54 + "\n")
+if __name__ == "__main__":
+
+    print("\n" + "=" * 60)
+    print("  SMART EV CHARGING CONTROL & ROUTE OPTIMIZER")
+    print("=" * 60)
+    print(f"  {'Application':<24}http://127.0.0.1:5000")
+    print(f"  {'Frontend':<24}http://127.0.0.1:5000/")
+    print(f"  {'API':<24}http://127.0.0.1:5000/api")
+    print(f"  {'Health Check':<24}http://127.0.0.1:5000/api/health")
+    print("=" * 60 + "\n")
 
     app.run(
         host="0.0.0.0",
